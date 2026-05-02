@@ -30,7 +30,7 @@ static void log_camera_bus_probe(i2c_master_bus_handle_t bus)
         0x21, /* GC0308 family */
         0x48, /* MT9D111 */
     };
-    ESP_LOGI(TAG, "SCCB probe (OV3660 normally 0x3c / 0x3d):");
+    ESP_LOGI(TAG, "SCCB probe (OV3660/OV5640 often 0x3c; OV3660 alt SID 0x3d):");
     for (unsigned i = 0; i < sizeof(addrs); i++) {
         esp_err_t e = i2c_master_probe(bus, addrs[i], 200);
         ESP_LOGI(TAG, "  7-bit 0x%02x -> %s", addrs[i], esp_err_to_name(e));

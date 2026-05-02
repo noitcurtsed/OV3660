@@ -24,7 +24,13 @@ extern "C" {
 #define EXAMPLE_DVP_CAM_SCCB_SDA_IO        (CONFIG_EXAMPLE_CAM_SCCB_SDA_GPIO)
 #define EXAMPLE_DVP_CAM_SCCB_SCL_IO        (CONFIG_EXAMPLE_CAM_SCCB_SCL_GPIO)
 
+#if CONFIG_EXAMPLE_CAMERA_SENSOR_OV5640
+#define EXAMPLE_DVP_CAM_XCLK_FREQ_HZ       (24000000)
+#elif CONFIG_EXAMPLE_CAMERA_SENSOR_OV3660
 #define EXAMPLE_DVP_CAM_XCLK_FREQ_HZ       (20000000)
+#else
+#error "Select OV3660 or OV5640 under Example Configuration > Camera sensor model."
+#endif
 
 #define EXAMPLE_DVP_CAM_DATA_WIDTH         (8)
 
@@ -49,7 +55,16 @@ extern "C" {
 #define EXAMPLE_DVP_CAM_BUF_ALLOC_CAPS     (MALLOC_CAP_INTERNAL | MALLOC_CAP_DMA)
 #endif
 
-/* OV3660 format names must match esp_cam_sensor ov3660.c (.name strings). */
+#if CONFIG_EXAMPLE_CAMERA_SENSOR_OV5640
+#define EXAMPLE_CAM_HRES_RUNTIME 320
+#define EXAMPLE_CAM_VRES_RUNTIME 240
+#else
+#define EXAMPLE_CAM_HRES_RUNTIME CONFIG_EXAMPLE_CAM_HRES
+#define EXAMPLE_CAM_VRES_RUNTIME CONFIG_EXAMPLE_CAM_VRES
+#endif
+
+/* Format .name strings must match esp_cam_sensor ov3660.c / ov5640.c. */
+#if CONFIG_EXAMPLE_CAMERA_SENSOR_OV3660
 #if CONFIG_EXAMPLE_CAM_HRES == 240 && CONFIG_EXAMPLE_CAM_VRES == 240
 #if CONFIG_EXAMPLE_CAM_INPUT_FORMAT_YUV422
 #define EXAMPLE_CAM_FORMAT                  "DVP_8bit_20Minput_YUV422_240x240_24fps"
@@ -63,9 +78,18 @@ extern "C" {
 #define EXAMPLE_CAM_FORMAT                  "DVP_8bit_20Minput_RGB565_640x480_10fps"
 #endif
 #endif
+#endif
+
+#if CONFIG_EXAMPLE_CAMERA_SENSOR_OV5640
+#if CONFIG_EXAMPLE_CAM_INPUT_FORMAT_YUV422
+#define EXAMPLE_CAM_FORMAT                  "DVP_8bit_24Minput_YUV422_320x240_10fps"
+#elif CONFIG_EXAMPLE_CAM_INPUT_FORMAT_RGB565
+#define EXAMPLE_CAM_FORMAT                  "DVP_8bit_24Minput_RGB565_320x240_10fps"
+#endif
+#endif
 
 #ifndef EXAMPLE_CAM_FORMAT
-#error "Unsupported camera format for OV3660: use menuconfig resolutions 240x240 or 640x480 with RGB565 or YUV422."
+#error "Unsupported camera format: OV3660 uses 240x240 or 640x480; OV5640 uses QVGA 320x240; pick RGB565 or YUV422 in menuconfig."
 #endif
 
 //----------LCD Config------------//

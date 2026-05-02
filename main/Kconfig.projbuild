@@ -1,5 +1,25 @@
 menu "Example Configuration"
 
+    choice EXAMPLE_CAMERA_SENSOR_MODEL
+        prompt "Camera sensor model (DVP)"
+        default EXAMPLE_CAMERA_SENSOR_OV3660
+        depends on SOC_LCDCAM_CAM_SUPPORTED
+        help
+            Chooses which sensor driver is built into the firmware and registered for SCCB/DVP auto-detection.
+            Enable exactly one sensor here; do not enable the other sensor under "Espressif Camera Sensors Configurations"
+            or both drivers may probe the bus.
+
+        config EXAMPLE_CAMERA_SENSOR_OV3660
+            bool "OV3660"
+            select CAMERA_OV3660
+            select CAMERA_OV3660_AUTO_DETECT_DVP_INTERFACE_SENSOR
+
+        config EXAMPLE_CAMERA_SENSOR_OV5640
+            bool "OV5640"
+            select CAMERA_OV5640
+            select CAMERA_OV5640_AUTO_DETECT_DVP_INTERFACE_SENSOR
+    endchoice
+
     config EXAMPLE_ENABLE_LCD
         bool "Enable SPI LCD output (ST7789 on ESP32-S3-EYE sub-board)"
         default n
@@ -7,8 +27,36 @@ menu "Example Configuration"
             Disable this if your kit has no LCD, a different controller, or different wiring.
             The camera pipeline still runs; frames are not drawn.
 
+    menu "OV5640 display tuning"
+        depends on EXAMPLE_CAMERA_SENSOR_OV5640 && EXAMPLE_ENABLE_LCD
+
+        config EXAMPLE_OV5640_LCD_SWAP_XY
+            bool "Swap LCD panel X/Y for QVGA (320x240)"
+            default y
+            help
+                Portrait ST7789 boards are often 240x320 physical pixels while OV5640 QVGA is 320x240.
+                Drawing without swapping axes overflows the shorter dimension and often looks like missing
+                or alternating wrong rows. Disable if your panel is already mounted landscape.
+
+        config EXAMPLE_OV5640_SENSOR_PIXEL_SWAP
+            bool "OV5640 pixel byte swap (Espressif CAM sensor option)"
+            default y
+            select CAMERA_SENSOR_SWAP_PIXEL_BYTE_ORDER
+            help
+                Enables pixel byte order swapping under Espressif Camera Sensors (OV5640 is in the supported list).
+                Often fixes striped / every-other-line chroma artifacts with YUV422 and RGB565 endian mismatches on DVP.
+
+        config EXAMPLE_OV5640_LCD_BGR565
+            bool "ST7789 RGB element order BGR565 (fixes yellow/purple cast)"
+            default y
+            help
+                Many SPI ST7789 paths expect 16-bit pixels as BGR565. If red and blue look swapped (e.g. sky purple,
+                skin yellow), keep this on. Disable if whites look correct only with classic RGB565 labelling.
+    endmenu
+
     choice EXAMPLE_CAM_HRES
         bool "Set camera horizontal resolution"
+        depends on EXAMPLE_CAMERA_SENSOR_OV3660
         default EXAMPLE_CAM_HRES_240
 
         config EXAMPLE_CAM_HRES_640
@@ -19,11 +67,13 @@ menu "Example Configuration"
 
     config EXAMPLE_CAM_HRES
         int
+        default 320 if EXAMPLE_CAMERA_SENSOR_OV5640
         default 640 if EXAMPLE_CAM_HRES_640
         default 240 if EXAMPLE_CAM_HRES_240
 
     choice EXAMPLE_CAM_VRES
         bool "Set camera vertical resolution"
+        depends on EXAMPLE_CAMERA_SENSOR_OV3660
         default EXAMPLE_CAM_VRES_480 if EXAMPLE_CAM_HRES_640
         default EXAMPLE_CAM_VRES_240 if EXAMPLE_CAM_HRES_240
 
@@ -35,8 +85,12 @@ menu "Example Configuration"
 
     config EXAMPLE_CAM_VRES
         int
+        default 240 if EXAMPLE_CAMERA_SENSOR_OV5640
         default 480 if EXAMPLE_CAM_VRES_480
         default 240 if EXAMPLE_CAM_VRES_240
+
+    comment "OV5640 DVP uses fixed QVGA 320x240 in firmware (matches LCD frame buffer size better than SVGA)."
+    depends on EXAMPLE_CAMERA_SENSOR_OV5640
 
     choice EXAMPLE_CAM_INPUT_FORMAT
         bool "Set camera input format"
@@ -68,7 +122,7 @@ menu "Example Configuration"
         range 0 500
         default 150
         help
-            OV3660 needs stable MCLK before ID registers respond. Increase if you see SCCB NACK / Get sensor ID failed.
+            Sensors need stable MCLK before ID registers respond on SCCB. Increase if you see NACK / Get sensor ID failed.
 
     config EXAMPLE_CAM_SCCB_FREQ_KHZ
         int "Camera SCCB / I2C clock frequency (kHz)"
@@ -87,6 +141,6 @@ menu "Example Configuration"
         bool "Log I2C probe for common camera addresses (0x30,0x36,0x3c,0x3d,...)"
         default n
         help
-            Prints which addresses ACK before sensor detection. OV3660 expects 0x3c (or 0x3d if SID strapped).
+            Prints which addresses ACK before sensor detection. OV3660/OV5640 often use 0x3c; OV3660 may use 0x3d if SID strapped.
 
 endmenu

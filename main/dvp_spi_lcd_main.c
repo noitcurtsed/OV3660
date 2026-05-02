@@ -13,6 +13,7 @@
 #include "freertos/task.h"
 #include "freertos/queue.h"
 #include "esp_lcd_panel_ops.h"
+#include "esp_lcd_panel_dev.h"
 #include "esp_cache.h"
 #include "driver/i2c_master.h"
 #include "esp_cam_ctlr.h"
@@ -26,7 +27,7 @@
 
 static const char *TAG = "dvp_spi_lcd";
 
-#define BUFFER_SIZE         (CONFIG_EXAMPLE_CAM_HRES * CONFIG_EXAMPLE_CAM_VRES * EXAMPLE_RGB565_BYTES_PER_PIXEL)
+#define BUFFER_SIZE         (EXAMPLE_CAM_HRES_RUNTIME * EXAMPLE_CAM_VRES_RUNTIME * EXAMPLE_RGB565_BYTES_PER_PIXEL)
 
 typedef struct {
     esp_lcd_panel_handle_t panel_hdl;
@@ -50,7 +51,7 @@ static void lcd_draw_task(void *arg)
     example_lcd_frame_t frame;
     while (xQueueReceive(s_lcd_frame_q, &frame, portMAX_DELAY) == pdTRUE) {
         if (frame.panel && frame.pix) {
-            esp_lcd_panel_draw_bitmap(frame.panel, 0, 0, CONFIG_EXAMPLE_CAM_HRES, CONFIG_EXAMPLE_CAM_VRES, frame.pix);
+            esp_lcd_panel_draw_bitmap(frame.panel, 0, 0, EXAMPLE_CAM_HRES_RUNTIME, EXAMPLE_CAM_VRES_RUNTIME, frame.pix);
         }
     }
 }
@@ -114,10 +115,17 @@ static void lcd_display_init(esp_lcd_panel_handle_t *lcd_panel_hdl, esp_lcd_pane
                     ));
 
     //----------ST7789 Panel initialization------------//
-    ESP_LOGI(TAG, "New ST7789 panel");
+#if CONFIG_EXAMPLE_CAMERA_SENSOR_OV5640 && CONFIG_EXAMPLE_OV5640_LCD_BGR565
+    const lcd_rgb_element_order_t lcd_rgb_order = LCD_RGB_ELEMENT_ORDER_BGR;
+#else
+    const lcd_rgb_element_order_t lcd_rgb_order = LCD_RGB_ELEMENT_ORDER_RGB;
+#endif
+    ESP_LOGI(TAG, "New ST7789 panel (RGB element order %s)",
+             lcd_rgb_order == LCD_RGB_ELEMENT_ORDER_BGR ? "BGR565" : "RGB565");
+
     const esp_lcd_panel_dev_config_t panel_dev_cfg = {
         .reset_gpio_num   = EXAMPLE_LCD_RST,
-        .color_space      = ESP_LCD_COLOR_SPACE_RGB,
+        .rgb_ele_order    = lcd_rgb_order,
         .bits_per_pixel   = EXAMPLE_RGB565_BITS_PER_PIXEL,
     };
     ESP_ERROR_CHECK(esp_lcd_new_panel_st7789(lcd_io_hdl, &panel_dev_cfg, &panel_handle));
@@ -125,6 +133,10 @@ static void lcd_display_init(esp_lcd_panel_handle_t *lcd_panel_hdl, esp_lcd_pane
     ESP_LOGI(TAG, "Reset and init panel");
     esp_lcd_panel_reset(panel_handle);
     esp_lcd_panel_init(panel_handle);
+#if CONFIG_EXAMPLE_OV5640_LCD_SWAP_XY
+    ESP_LOGI(TAG, "LCD swap_xy enabled (OV5640 QVGA vs portrait ST7789)");
+    ESP_ERROR_CHECK(esp_lcd_panel_swap_xy(panel_handle, true));
+#endif
     esp_lcd_panel_invert_color(panel_handle, true);
 
     ESP_LOGI(TAG, "Turn on display");
@@ -174,8 +186,8 @@ void app_main(void)
     esp_cam_ctlr_dvp_config_t dvp_config = {
         .ctlr_id = 0,
         .clk_src = CAM_CLK_SRC_DEFAULT,
-        .h_res = CONFIG_EXAMPLE_CAM_HRES,
-        .v_res = CONFIG_EXAMPLE_CAM_VRES,
+        .h_res = EXAMPLE_CAM_HRES_RUNTIME,
+        .v_res = EXAMPLE_CAM_VRES_RUNTIME,
 #if CONFIG_EXAMPLE_CAM_INPUT_FORMAT_YUV422
         .input_data_color_type = CAM_CTLR_COLOR_YUV422,
 #else
@@ -193,11 +205,11 @@ void app_main(void)
         return;
     }
 
-    /* DVP driver starts XCLK here; OV3660 needs stable MCLK before SCCB ID reads succeed. */
+    /* DVP driver starts XCLK here; allow SCCB settle before sensor ID probe (OV3660/OV5640). */
     vTaskDelay(pdMS_TO_TICKS(CONFIG_EXAMPLE_CAM_XCLK_SETTLE_MS));
 
     //--------Allocate Camera Buffer----------//
-    size_t cam_buffer_size = CONFIG_EXAMPLE_CAM_HRES * CONFIG_EXAMPLE_CAM_VRES * EXAMPLE_RGB565_BYTES_PER_PIXEL;
+    size_t cam_buffer_size = EXAMPLE_CAM_HRES_RUNTIME * EXAMPLE_CAM_VRES_RUNTIME * EXAMPLE_RGB565_BYTES_PER_PIXEL;
 #if CONFIG_EXAMPLE_ENABLE_LCD
     void *cam_buf0 = esp_cam_ctlr_alloc_buffer(cam_handle, cam_buffer_size, EXAMPLE_DVP_CAM_BUF_ALLOC_CAPS);
     void *cam_buf1 = esp_cam_ctlr_alloc_buffer(cam_handle, cam_buffer_size, EXAMPLE_DVP_CAM_BUF_ALLOC_CAPS);
