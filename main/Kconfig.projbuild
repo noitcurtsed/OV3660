@@ -1,0 +1,92 @@
+menu "Example Configuration"
+
+    config EXAMPLE_ENABLE_LCD
+        bool "Enable SPI LCD output (ST7789 on ESP32-S3-EYE sub-board)"
+        default n
+        help
+            Disable this if your kit has no LCD, a different controller, or different wiring.
+            The camera pipeline still runs; frames are not drawn.
+
+    choice EXAMPLE_CAM_HRES
+        bool "Set camera horizontal resolution"
+        default EXAMPLE_CAM_HRES_240
+
+        config EXAMPLE_CAM_HRES_640
+            bool "640"
+        config EXAMPLE_CAM_HRES_240
+            bool "240"
+    endchoice
+
+    config EXAMPLE_CAM_HRES
+        int
+        default 640 if EXAMPLE_CAM_HRES_640
+        default 240 if EXAMPLE_CAM_HRES_240
+
+    choice EXAMPLE_CAM_VRES
+        bool "Set camera vertical resolution"
+        default EXAMPLE_CAM_VRES_480 if EXAMPLE_CAM_HRES_640
+        default EXAMPLE_CAM_VRES_240 if EXAMPLE_CAM_HRES_240
+
+        config EXAMPLE_CAM_VRES_480
+            bool "480"
+        config EXAMPLE_CAM_VRES_240
+            bool "240"
+    endchoice
+
+    config EXAMPLE_CAM_VRES
+        int
+        default 480 if EXAMPLE_CAM_VRES_480
+        default 240 if EXAMPLE_CAM_VRES_240
+
+    choice EXAMPLE_CAM_INPUT_FORMAT
+        bool "Set camera input format"
+        default EXAMPLE_CAM_INPUT_FORMAT_YUV422
+
+        config EXAMPLE_CAM_INPUT_FORMAT_RGB565
+            bool "RGB565"
+        config EXAMPLE_CAM_INPUT_FORMAT_YUV422
+            bool "YUV422"
+    endchoice
+
+    config EXAMPLE_CAM_SCCB_SDA_GPIO
+        int "Camera SCCB SDA (SIOD) GPIO"
+        range 0 48
+        default 4
+        help
+            Espressif ESP32-S3-EYE default is GPIO 4 (same camera SCCB bus as BSP_I2C_SDA).
+            Change only if your PCB differs.
+
+    config EXAMPLE_CAM_SCCB_SCL_GPIO
+        int "Camera SCCB SCL (SIOC) GPIO"
+        range 0 48
+        default 5
+        help
+            Espressif ESP32-S3-EYE default is GPIO 5 (same as BSP_I2C_SCL).
+
+    config EXAMPLE_CAM_XCLK_SETTLE_MS
+        int "Delay after DVP starts XCLK before SCCB probe (ms)"
+        range 0 500
+        default 150
+        help
+            OV3660 needs stable MCLK before ID registers respond. Increase if you see SCCB NACK / Get sensor ID failed.
+
+    config EXAMPLE_CAM_SCCB_FREQ_KHZ
+        int "Camera SCCB / I2C clock frequency (kHz)"
+        range 10 400
+        default 40
+        help
+            Try 10 if the bus misbehaves at higher speeds; try up to 100 if probing is stable.
+
+    config EXAMPLE_CAM_I2C_PULLUP_INTERNAL
+        bool "Enable internal pull-ups on SCCB SDA/SCL"
+        default y
+        help
+            Disable only if your PCB already has external pull-ups (avoid weak dual pull-ups).
+
+    config EXAMPLE_CAM_I2C_PROBE
+        bool "Log I2C probe for common camera addresses (0x30,0x36,0x3c,0x3d,...)"
+        default n
+        help
+            Prints which addresses ACK before sensor detection. OV3660 expects 0x3c (or 0x3d if SID strapped).
+
+endmenu
